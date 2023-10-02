@@ -1,0 +1,65 @@
+version: '3.8'
+services:
+  web:
+    build: .
+    image: web
+    container_name: web
+    network_mode: "host"
+    command: python3 run.py
+    volumes:
+      - .:/usr/src/app
+    environment:
+      - FLASK_DEBUG=1
+      - APP_SETTINGS=project.server.config.DevelopmentConfig
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
+    depends_on:
+      - redis
+      - db
+
+  worker:
+    build: .
+    command: celery -A anomaly_checker.celery_app.celery_app worker --loglevel=INFO
+    # command: python3 --version
+    network_mode: "host"
+    volumes:
+      - .:/usr/src/app
+    environment:
+      - FLASK_DEBUG=1
+      - APP_SETTINGS=project.server.config.DevelopmentConfig
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
+    depends_on:
+      - redis
+      - db
+      - web
+
+  beater:
+    build: .
+    command: celery -A anomaly_checker.celery_app.celery_app beat
+    network_mode: "host"
+    volumes:
+      - .:/usr/src/app
+    environment:
+      - FLASK_DEBUG=1
+      - APP_SETTINGS=project.server.config.DevelopmentConfig
+      - CELERY_BROKER_URL=redis://localhost:6379/0
+      - CELERY_RESULT_BACKEND=redis://localhost:6379/0
+    depends_on:
+      - redis
+      - db
+      - web
+
+  redis:
+    image: redis:6-alpine
+    network_mode: "host"
+
+  db:
+    image: yandex/clickhouse-server
+    network_mode: "host"
+     
+    ulimits:
+      nproc: 65535
+      nofile:
+       soft: 262144
+       hard: 262144
